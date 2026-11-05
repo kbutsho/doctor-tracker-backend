@@ -1,5 +1,10 @@
 # Doctor Tracker – Backend API
 
+## Live Demo
+
+- **Frontend:** https://doctor-tracker-frontend-gqfang8af.vercel.app
+- **Backend:** https://doctor-tracker-backend-ws6t.onrender.com
+
 ## Description
 
 Doctor Tracker API is the secure REST backend for a hospital admin portal that manages doctors and their patients. Built with Express and MongoDB, it provides JWT authentication (httpOnly cookies with refresh-token rotation), role-based authorization, doctor and patient CRUD with indexed server-side search, filtering and pagination, admin profile and password management, and aggregated analytics endpoints that power the dashboard charts. The Next.js client lives in `doctor-tracker-frontend`.

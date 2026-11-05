@@ -27,11 +27,11 @@ Doctor Tracker API is the secure REST backend for a hospital admin portal that m
    | `SEED_ADMIN_NAME/EMAIL/PASSWORD` | admin created by the seed script (`admin@gmail.com` / `Admin@123456`) |
 3. Seed the database (admin user, 14 doctors, 220 patients, indexes)
    ```bash
-   npm run seed          # use `npm run seed:fresh` to wipe doctors/patients first
+   npm run seed         
    ```
 4. Start the server
    ```bash
-   npm run dev           # http://localhost:5000/api   (npm start for production)
+   npm run dev          
    ```
 5. Check `GET http://localhost:5000/api/health`, then log in with the seeded admin.
 
@@ -43,21 +43,6 @@ Next.js client ──REST/JSON, httpOnly cookies──▶ Express API ──Mong
 request ─▶ helmet · cors · rate-limit ─▶ protect (JWT) ─▶ restrictTo(role) ─▶ validate (zod) ─▶ controller ─▶ model
                                                                                    └─▶ errorHandler (uniform JSON errors)
 ```
-
-```
-src/
-├── server.js, app.js        # boot, middleware stack, graceful shutdown
-├── config/                  # env validation, mongoose connection
-├── models/                  # User, Doctor, Patient (+ indexes)
-├── routes/                  # URL → middleware → controller
-├── controllers/             # auth, doctor, patient, dashboard logic
-├── validators/              # zod schemas for params, query, body
-├── middleware/              # auth (protect/restrictTo), validate, errorHandler, rateLimiters
-├── utils/                   # ApiError, asyncHandler, tokens, helpers
-└── seed/seed.js
-```
-
-**Request flow:** every route except `/health`, `/auth/login`, `/auth/refresh`, `/auth/logout` passes through `protect`, which accepts the httpOnly `accessToken` cookie or a `Bearer` header. Input is validated with zod before reaching controllers, and all failures are normalised to `{ success:false, message, details? }`.
 
 ### API Reference (prefix `/api`)
 
@@ -86,11 +71,19 @@ src/
 
 ## Technical Decisions
 
-### 1. JWT in httpOnly cookies with hashed, rotating refresh tokens
-A 15-minute access token and a 7-day refresh token are issued as httpOnly cookies, so scripts (and XSS) cannot read them. The refresh token is stored only as a SHA-256 hash on the user document and is rotated on every refresh; a stolen or replayed old token no longer matches and is rejected. Logout and password change clear or rotate the stored hash, which signs out other devices. A non-sensitive `session` marker cookie is set alongside, so the Next.js middleware can redirect anonymous visitors before rendering; it grants no access by itself. A `Bearer` header is also accepted so Postman and other API clients work. Trade-off: one active refresh session per user, in exchange for simple, revocable server-side control without a separate session store.
+### 1. JWT Authentication
+- JWT authentication using httpOnly cookies.
+- Access token expires in 15 minutes; refresh token in 7 days.
+- Refresh tokens are stored as SHA-256 hashes and rotated on every refresh.
+- Logout and password changes revoke existing sessions.
+- Bearer token support for Postman and external API clients.
 
-### 2. Index-backed queries and single-round-trip aggregations
-Compound indexes match the real access patterns (`doctor+createdAt`, `specialization+createdAt`, `hospital+createdAt`, `condition+createdAt`, …) so filter, sort and pagination avoid collection scans. The doctor list uses one `$facet` aggregation that returns the page and the total together, and runs the per-doctor patient-count `$lookup` *after* `$limit`, so it only touches one page of documents. Responses are gzip-compressed (`compression`). Dashboard analytics run in parallel (`Promise.all`) as `$group` aggregations, with gaps in daily timelines filled in code. Search uses escaped, case-insensitive regex for partial matching; for very large collections the next step is a MongoDB text index or Atlas Search.
+### 2. Database Optimization
+- Compound indexes for faster filtering, sorting and pagination.
+- MongoDB `$facet` retrieves paginated data and total count in one query.
+- `$lookup` runs after `$limit` to reduce database workload.
+- Dashboard analytics run in parallel using `Promise.all` and aggregation pipelines.
+- Regex-based partial search with escaped input.
 
 ## Visual Evidence
 
@@ -111,7 +104,3 @@ This is an API-only service, so the visual evidence is the client UI it powers. 
 | Login | Dashboard | Patients | Profile |
 |---|---|---|---|
 | <img src="docs/screenshots/mobile-01-login.png" width="190"> | <img src="docs/screenshots/mobile-02-dashboard.png" width="190"> | <img src="docs/screenshots/mobile-05-patients.png" width="190"> | <img src="docs/screenshots/mobile-06-profile.png" width="190"> |
-
-## Deployment
-
-Use MongoDB Atlas for `MONGODB_URI`, set `NODE_ENV=production` (disables auto-index build and hides stack traces), strong JWT secrets, and `CLIENT_URL` to the frontend origin. In production run `node -e "require('./src/seed/seed.js')"` once (or `npm run seed`) to create the admin and sync indexes. If the frontend uses its `/api` proxy (recommended), keep `COOKIE_SAME_SITE=lax`.

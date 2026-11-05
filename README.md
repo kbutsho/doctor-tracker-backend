@@ -2,7 +2,7 @@
 
 ## Live Demo
 
-- **Frontend:** https://kaushik-doctor-tracker-frontend.vercel.app
+- **Frontend:** https://kaushik-doctor-tracker.vercel.app
 - **Backend:** https://doctor-tracker-backend-ws6t.onrender.com
 
 ## Description
